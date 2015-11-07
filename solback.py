@@ -16,6 +16,9 @@ class BuildingsResource(object):
 
         """Handles GET requests"""
         resp.status = falcon.HTTP_200  # This is the default status
+        resp.set_header('X-Powered-By', 'OpenSolarMap')
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
         resp.body = (building[0])
 
 
