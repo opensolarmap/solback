@@ -10,7 +10,9 @@ class BuildingsResource(object):
         cur = db.cursor()
         cur.execute("""SELECT format('{"type":"Feature","properties":{"id":%s,"lat":%s,"lon":%s,"surface":%s},"geometry":%s}',
             osm_id, round(st_y(st_centroid(geom))::numeric,6), round(st_x(st_centroid(geom))::numeric,6),
-            round(surface::numeric), st_asgeojson(geom,6)) FROM buildings limit 1;"""
+            round(surface::numeric), st_asgeojson(geom,6)) FROM buildings
+            where ST_DWithin(ST_SetSRID(ST_MakePoint(2,48),4326),geom,0.05)
+            and surface>10 and orientation>0.9 order by random() limit 1;"""
         )
         building = cur.fetchone()
 
