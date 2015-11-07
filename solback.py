@@ -10,11 +10,19 @@ class BuildingsResource(object):
         ip = req.env['REMOTE_ADDR']
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
-        cur.execute("""SELECT format('{"type":"Feature","properties":{"id":%s,"lat":%s,"lon":%s,"surface":%s,"radius":%s},"geometry":%s}',
-            osm_id, round(st_y(st_centroid(geom))::numeric,6), round(st_x(st_centroid(geom))::numeric,6),
-            round(surface::numeric), round(st_length(st_longestline(geom,geom)::geography)::numeric/2,1), st_asgeojson(geom,6)) FROM buildings
-            where ST_DWithin(ST_SetSRID(ST_MakePoint(2.5,48.8),4326),geom,0.05)
-            and surface>100 and orientation>0.8 order by random() limit 1;"""
+        cur.execute("""SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
+            ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
+            ||',"lon":'|| round(st_x(st_centroid(geom))::numeric,6)::text
+            ||',"surface":'|| round(surface::numeric)::text
+            ||',"radius":'|| round(st_length(st_longestline(geom,geom)::geography)::numeric/2,1)::text
+            ||'},"geometry":'|| st_asgeojson(geom,6)
+            ||'}'
+            FROM buildings b
+            LEFT JOIN building_orient ON (osm_id=id and ip='%s')
+            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(2.5,48.8),4326),geom,0.05)
+            AND surface>100 AND b.orientation>0.8
+            AND ip IS NULL
+            ORDER BY random() LIMIT 1;""" % ip
         )
         building = cur.fetchone()
 
