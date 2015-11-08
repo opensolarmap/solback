@@ -8,6 +8,14 @@ import pp
 class BuildingsResource(object):
     def on_get(self, req, resp):
         ip = req.env['REMOTE_ADDR']
+        try:
+            lat = float(req.params["lat"])
+        except:
+            lat = 48.8
+        try:
+            lon = float(req.params["lon"])
+        except:
+            lon = 2.5
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
         # get one random building around our location
@@ -20,10 +28,10 @@ class BuildingsResource(object):
             ||'}'
             FROM buildings b
             LEFT JOIN building_orient ON (osm_id=id and ip='%s')
-            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(2.5,48.8),4326),geom,0.05)
+            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
             AND surface>100 AND b.orientation>0.8
             AND ip IS NULL
-            ORDER BY random() LIMIT 1;""" % ip
+            ORDER BY random() LIMIT 1;""" % (ip,lon,lat)
         )
         building = cur.fetchone()
 
@@ -89,4 +97,5 @@ stats = StatsResource()
 # things will handle all requests to the matching URL path
 app.add_route('/building', buildings)
 app.add_route('/stats', stats)
+app.add_route('/test', test)
 
