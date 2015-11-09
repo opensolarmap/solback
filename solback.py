@@ -22,9 +22,12 @@ class BuildingsResource(object):
             ||'}'
             FROM buildings b
             LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
+            LEFT JOIN building_orient o2 ON (osm_id=o2.id)
             WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.05)
-            AND surface>50 AND b.orientation>0.7 AND b.orient_type IS NULL
+            AND surface>100 AND b.orientation>0.7 AND b.orient_type IS NULL
             AND o1.ip IS NULL
+            GROUP by osm_id, geom, surface, b.orientation
+            HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
             ORDER BY b.orientation desc LIMIT 1;""" % (ip,lon,lat)
         )
         building = cur.fetchone()
