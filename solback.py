@@ -8,10 +8,14 @@ import pp
 class BuildingsResource(object):
     def on_get(self, req, resp):
         ip = req.env['REMOTE_ADDR']
-        lat = float(req.params.get('lat','43.3'))
+        lat = float(req.params.get('lat','43.4'))
         lon = float(req.params.get('lon','5.5'))
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
+        if (lat == 43.4):
+            order = "b.orientation DESC"
+        else:
+            order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))" % (lon,lat)
         # get one random building around our location
         cur.execute("""SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
             ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
@@ -28,7 +32,7 @@ class BuildingsResource(object):
             AND o1.ip IS NULL
             GROUP by osm_id, geom, surface, b.orientation
             HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
-            ORDER BY b.orientation desc LIMIT 1;""" % (ip,lon,lat)
+            ORDER BY %s LIMIT 1;""" % (ip,lon,lat,order)
         )
         building = cur.fetchone()
 
