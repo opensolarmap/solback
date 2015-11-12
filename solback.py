@@ -6,13 +6,13 @@ import psycopg2
 import pp
 
 class BuildingsResource(object):
-    def on_get(self, req, resp):
+    def getBuilding(self, req, resp):
         ip = req.env['REMOTE_ADDR']
-        lat = float(req.params.get('lat','43.4'))
-        lon = float(req.params.get('lon','5.5'))
+        lat = float(req.params.get('lat','43.3'))
+        lon = float(req.params.get('lon','5.0'))
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
-        if (lat == 43.4):
+        if (lat == 43.3):
             order = "b.orientation DESC"
         else:
             order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))" % (lon,lat)
@@ -27,7 +27,7 @@ class BuildingsResource(object):
             FROM buildings b
             LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
             LEFT JOIN building_orient o2 ON (osm_id=o2.id)
-            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.05)
+            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
             AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
             AND o1.ip IS NULL
             GROUP by osm_id, geom, surface, b.orientation
@@ -44,6 +44,9 @@ class BuildingsResource(object):
         resp.body = (building[0])
         db.close()
 
+    def on_get(self, req, resp):
+        self.getBuilding(req, resp);
+
     def on_post(self, req, resp):
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
@@ -57,10 +60,7 @@ class BuildingsResource(object):
         db.commit()
         cur.close()
         db.close()
-        resp.set_header('X-Powered-By', 'OpenSolarMap')
-        resp.set_header('Access-Control-Allow-Origin', '*')
-        resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
-        resp.status = falcon.HTTP_200
+        self.getBuilding(req, resp);
 
 class StatsResource(object):
     def on_get(self, req, resp):
