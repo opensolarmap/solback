@@ -7,17 +7,19 @@ import pp
 
 class BuildingsResource(object):
     def getBuilding(self, req, resp):
+        default_lat = '43.5'
+        default_lon = '5.4'
         ip = req.env['REMOTE_ADDR']
-        lat = float(req.params.get('lat','43.3'))
-        lon = float(req.params.get('lon','5.0'))
+        lat = float(req.params.get('lat',default_lat))
+        lon = float(req.params.get('lon',default_lon))
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
-        if (lat == 43.3):
-            order = "b.orientation DESC"
+        if (lat == float(default_lat)):
+            order = "n.nb DESC, n.last, b.orientation DESC"
         else:
-            order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))" % (lon,lat)
+            order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))/(coalesce(n.nb,0)*10+1)" % (lon,lat)
         # get one random building around our location
-        cur.execute("""SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
+        query = """SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
             ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
             ||',"lon":'|| round(st_x(st_centroid(geom))::numeric,6)::text
             ||',"surface":'|| round(surface::numeric)::text
@@ -27,13 +29,14 @@ class BuildingsResource(object):
             FROM buildings b
             LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
             LEFT JOIN building_orient o2 ON (osm_id=o2.id)
+            LEFT JOIN building_next n ON (n.id=b.osm_id AND n.nb>=0)
             WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
             AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
             AND o1.ip IS NULL
-            GROUP by osm_id, geom, surface, b.orientation
+            GROUP by osm_id, geom, surface, b.orientation, n.nb, n.last
             HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
             ORDER BY %s LIMIT 1;""" % (ip,lon,lat,order)
-        )
+        cur.execute(query)
         building = cur.fetchone()
 
         """Handles GET requests"""
