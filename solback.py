@@ -55,6 +55,12 @@ class BuildingsResource(object):
             cur.execute(query)
         building = cur.fetchone()
 
+        # cookie management
+        cookies = req.cookies
+        if "opensolar_user" in cookies:
+            my_cookie_value = cookies["opensolar_user"]
+        else:
+            resp.set_cookie("opensolar_user", str(uuid.uuid1()), path=".opensolarmap.org", secure=False, http_only=False)
         resp.status = falcon.HTTP_200
         resp.set_header('X-Powered-By', 'OpenSolarMap')
         resp.set_header('Access-Control-Allow-Origin', '*')
