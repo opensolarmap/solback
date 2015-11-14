@@ -1,50 +1,68 @@
 # solback.py
 
-# Let's get this party started
 import falcon
 import psycopg2
-import pp
+import uuid
 
 class BuildingsResource(object):
     def getBuilding(self, req, resp):
-        default_lat = '43.5'
-        default_lon = '5.4'
-        ip = req.env['REMOTE_ADDR']
-        lat = float(req.params.get('lat',default_lat))
-        lon = float(req.params.get('lon',default_lon))
         db = psycopg2.connect("dbname=osm user=cquest")
         cur = db.cursor()
-        if (lat == float(default_lat)):
-            order = "n.nb DESC, n.last, b.orientation DESC"
-        else:
-            order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))/(coalesce(n.nb,0)*10+1)" % (lon,lat)
-        # get one random building around our location
+        ip = req.env['REMOTE_ADDR']
+        # get a building from the allready partially crowdsourced ones
         query = """SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
             ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
             ||',"lon":'|| round(st_x(st_centroid(geom))::numeric,6)::text
             ||',"surface":'|| round(surface::numeric)::text
             ||',"radius":'|| round(st_length(st_longestline(geom,geom)::geography)::numeric/2,1)::text
-            ||'},"geometry":'|| st_asgeojson(geom,6)
-            ||'}'
-            FROM buildings b
-            LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
-            LEFT JOIN building_orient o2 ON (osm_id=o2.id)
-            LEFT JOIN building_next n ON (n.id=b.osm_id AND n.nb>=0)
-            WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
-            AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
-            AND o1.ip IS NULL
-            GROUP by osm_id, geom, surface, b.orientation, n.nb, n.last
-            HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
-            ORDER BY %s LIMIT 1;""" % (ip,lon,lat,order)
+            ||'},"geometry":'|| st_asgeojson(geom,6) ||'}'
+            FROM building_next n
+            LEFT JOIN building_orient o ON (o.id=n.id and o.ip='%s')
+            JOIN buildings b ON (b.osm_id=n.id)
+            WHERE o.ip is null
+            GROUP BY b.osm_id, b.geom, b.surface, n.nb, n.last, b.orient_type
+            HAVING orient_type is null
+            ORDER BY n.nb desc, n.last limit 1;""" % (ip)
         cur.execute(query)
+
+        if cur.rowcount == 0:
+            # get one random building around our location
+            default_lat = '43.5'
+            default_lon = '5.4'
+            lat = float(req.params.get('lat',default_lat))
+            lon = float(req.params.get('lon',default_lon))
+            if (lat == float(default_lat)):
+                order = "n.nb DESC, n.last, b.orientation DESC"
+            else:
+                order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))/(coalesce(n.nb,0)*10+1)" % (lon,lat)
+            query = """SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
+                ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
+                ||',"lon":'|| round(st_x(st_centroid(geom))::numeric,6)::text
+                ||',"surface":'|| round(surface::numeric)::text
+                ||',"radius":'|| round(st_length(st_longestline(geom,geom)::geography)::numeric/2,1)::text
+                ||'},"geometry":'|| st_asgeojson(geom,6)
+                ||'}'
+                FROM buildings b
+                LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
+                LEFT JOIN building_orient o2 ON (osm_id=o2.id)
+                LEFT JOIN building_next n ON (n.id=b.osm_id AND n.nb>=0)
+                WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
+                AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
+                AND o1.ip IS NULL
+                GROUP by osm_id, geom, surface, b.orientation, n.nb, n.last
+                HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
+                ORDER BY %s LIMIT 1;""" % (ip,lon,lat,order)
+            cur.execute(query)
         building = cur.fetchone()
 
-        """Handles GET requests"""
-        resp.status = falcon.HTTP_200  # This is the default status
+        resp.status = falcon.HTTP_200
         resp.set_header('X-Powered-By', 'OpenSolarMap')
         resp.set_header('Access-Control-Allow-Origin', '*')
         resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
-        resp.body = (building[0])
+        try:
+            resp.body = (building[0])
+        except:
+            print("no building")
         db.close()
 
     def on_get(self, req, resp):
