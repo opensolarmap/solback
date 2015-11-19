@@ -19,7 +19,7 @@ class BuildingsResource(object):
             FROM building_next n
             LEFT JOIN building_orient o ON (o.id=n.id and o.ip='%s')
             JOIN buildings b ON (b.osm_id=n.id)
-            WHERE o.ip is null
+            WHERE n.total<10 AND o.ip is null
             GROUP BY b.osm_id, b.geom, b.surface, n.nb, n.last, b.orient_type
             HAVING orient_type is null
             ORDER BY n.nb desc, n.last limit 1;""" % (ip)
@@ -27,8 +27,8 @@ class BuildingsResource(object):
 
         if cur.rowcount == 0:
             # get one random building around our location
-            default_lat = '43.5'
-            default_lon = '5.4'
+            default_lat = '44.1'
+            default_lon = '4.8'
             lat = float(req.params.get('lat',default_lat))
             lon = float(req.params.get('lon',default_lon))
             if (lat == float(default_lat)):
@@ -48,7 +48,7 @@ class BuildingsResource(object):
                 LEFT JOIN building_next n ON (n.id=b.osm_id AND n.nb>=0)
                 WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
                 AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
-                AND o1.ip IS NULL
+                AND coalesce(n.total,0)<10 AND o1.ip IS NULL
                 GROUP by osm_id, geom, surface, b.orientation, n.nb, n.last
                 HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
                 ORDER BY %s LIMIT 1;""" % (ip,lon,lat,order)

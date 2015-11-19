@@ -52,7 +52,8 @@ CREATE VIEW building_contribs AS
 CREATE VIEW building_next AS
  SELECT c1.id,
     ((c1.nb)::numeric - COALESCE(sum(c2.nb), (0)::numeric)) AS nb,
-    c1.last
+    c1.last,
+    ((c1.nb)::numeric + COALESCE(sum(c2.nb), (0)::numeric)) AS total
    FROM (building_contribs c1
      LEFT JOIN building_contribs c2 ON (((c2.id = c1.id) AND (c2.rank > 1))))
   WHERE ((c1.rank = 1) AND (c1.nb >= 3))
@@ -78,6 +79,13 @@ CREATE TABLE buildings (
 --
 
 CREATE INDEX building_geom_no_orient ON buildings USING gist (geom) WHERE (orient_type IS NULL);
+
+
+--
+-- Name: building_id_no_orient; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX building_id_no_orient ON buildings USING btree (osm_id) WHERE (orient_type IS NULL);
 
 
 --
