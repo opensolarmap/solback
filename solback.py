@@ -27,8 +27,8 @@ class BuildingsResource(object):
 
         if cur.rowcount == 0:
             # get one random building around our location
-            default_lat = '44.1'
-            default_lon = '4.8'
+            default_lat = '48.47'
+            default_lon = '6.06'
             lat = float(req.params.get('lat',default_lat))
             lon = float(req.params.get('lon',default_lon))
             if (lat == float(default_lat)):
@@ -115,14 +115,34 @@ class StatsResource(object):
         resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
         resp.status = falcon.HTTP_200
 
+class GraphResource(object):
+    def on_get(self, req, resp):
+        db = psycopg2.connect("dbname=osm user=cquest")
+        cur = db.cursor()
+        ip = req.env['REMOTE_ADDR']
+        # get data to display activity graphs
+        query = """select row_to_json(r.*)::text from
+            (select array_agg(d order by d) as d, array_agg(n order by d) as n from
+            (select date_trunc('day',time) as d, count(*) as n from building_orient group by 1 order by 1) as s) as r;"""
+        cur.execute(query)
+        graph = cur.fetchone()
+        resp.status = falcon.HTTP_200
+        resp.set_header('X-Powered-By', 'OpenSolarMap')
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
+        resp.body = (graph[0])
+        db.close()
+
+
 # falcon.API instances are callable WSGI apps
 app = falcon.API()
 
 # Resources are represented by long-lived class instances
 buildings = BuildingsResource()
 stats = StatsResource()
+graph = GraphResource()
 
 # things will handle all requests to the matching URL path
 app.add_route('/building', buildings)
 app.add_route('/stats', stats)
-
+app.add_route('/graph',graph)
