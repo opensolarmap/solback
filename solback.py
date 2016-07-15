@@ -6,9 +6,9 @@ import uuid
 
 class BuildingsResource(object):
     def getBuilding(self, req, resp):
-        db = psycopg2.connect("dbname=osm user=cquest")
+        db = psycopg2.connect("dbname=opensolarmap user=cquest")
         cur = db.cursor()
-        ip = req.env['REMOTE_ADDR']
+        ip = req.access_route[0]
         # get a building from the allready partially crowdsourced ones
         query = """SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
             ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
@@ -27,8 +27,8 @@ class BuildingsResource(object):
 
         if cur.rowcount == 0:
             # get one random building around our location
-            default_lat = '48.47'
-            default_lon = '6.06'
+            default_lat = '47.7927'
+            default_lon = '3.5840'
             lat = float(req.params.get('lat',default_lat))
             lon = float(req.params.get('lon',default_lon))
             if (lat == float(default_lat)):
@@ -75,11 +75,11 @@ class BuildingsResource(object):
         self.getBuilding(req, resp);
 
     def on_post(self, req, resp):
-        db = psycopg2.connect("dbname=osm user=cquest")
+        db = psycopg2.connect("dbname=opensolarmap user=cquest")
         cur = db.cursor()
-        id=int(req.params['id'])
-        type=int(req.params['type'])
-        ip=req.env['REMOTE_ADDR']
+        id = int(req.params['id'])
+        type = int(req.params['type'])
+        ip = req.access_route[0]
         cur.execute(
             """INSERT INTO building_orient (id, orientation, time, ip) VALUES (%s, %s, NOW(), %s);""",
             (id,type,ip)
@@ -91,8 +91,8 @@ class BuildingsResource(object):
 
 class StatsResource(object):
     def on_get(self, req, resp):
-        ip = req.env['REMOTE_ADDR']
-        db = psycopg2.connect("dbname=osm user=cquest")
+        ip = req.access_route[0]
+        db = psycopg2.connect("dbname=opensolarmap user=cquest")
         cur = db.cursor()
         cur.execute("SELECT count(*) from building_orient where ip = '%s';" % ip)
         stat = cur.fetchone()
@@ -117,9 +117,9 @@ class StatsResource(object):
 
 class GraphResource(object):
     def on_get(self, req, resp):
-        db = psycopg2.connect("dbname=osm user=cquest")
+        db = psycopg2.connect("dbname=opensolarmap user=cquest")
         cur = db.cursor()
-        ip = req.env['REMOTE_ADDR']
+        ip = req.access_route[0]
         # get data to display activity graphs
         query = """select row_to_json(r.*)::text from
             (select array_agg(d order by d) as d, array_agg(n order by d) as n from
