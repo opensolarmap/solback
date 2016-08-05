@@ -73,7 +73,7 @@ class BuildingsResource(object):
         resp.set_header('Access-Control-Allow-Origin', '*')
         resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
 
-        if cur.rowcount > 1:
+        if cur.rowcount > 0:
             # return de Featurecollection when we have several buildings...
             rows = cur.fetchall()
             body = dict(count=cur.rowcount, type="Featurecollection", features=[json.loads(r[0]) for r in rows])
@@ -83,7 +83,7 @@ class BuildingsResource(object):
                 building = cur.fetchone()
                 resp.body = building[0]
             except:
-                resp.body = "no building"
+                resp.body = '{"message":"no building"}'
         db.close()
 
     def on_get(self, req, resp):
@@ -102,7 +102,10 @@ class BuildingsResource(object):
         db.commit()
         cur.close()
         db.close()
-        self.getBuilding(req, resp);
+        if 'next' in req.params:
+            resp.status = falcon.HTTP_200
+        else:
+            self.getBuilding(req, resp);
 
 class StatsResource(object):
     def on_get(self, req, resp):
