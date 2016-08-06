@@ -4,6 +4,8 @@ import falcon
 import psycopg2
 import uuid
 import json
+import random
+
 class BuildingsResource(object):
     def getBuilding(self, req, resp):
         db = psycopg2.connect("dbname=opensolarmap user=cquest")
@@ -64,6 +66,33 @@ class BuildingsResource(object):
                 ORDER BY %s LIMIT %s;""" % (ip,lon,lat,order,limit)
             cur.execute(query)
             rows = rows + cur.fetchall()
+            limit = limit - len(rows)
+
+        if limit > 0:
+            # get random buildings around our location
+            lat = default_lat+random.random()
+            lon = default_lon+random.random()
+            order = "ST_Distance(geom,ST_SetSRID(ST_MakePoint(%s,%s),4326))/(coalesce(n.nb,0)*10+1)" % (lon,lat)
+            query = """SELECT '{"type":"Feature","properties":{"id":'|| osm_id::text
+                ||',"lat":'|| round(st_y(st_centroid(geom))::numeric,6)::text
+                ||',"lon":'|| round(st_x(st_centroid(geom))::numeric,6)::text
+                ||',"surface":'|| round(surface::numeric)::text
+                ||',"radius":'|| round(st_length(st_longestline(geom,geom)::geography)::numeric/2,1)::text
+                ||'},"geometry":'|| st_asgeojson(geom,6)
+                ||'}'
+                FROM buildings b
+                LEFT JOIN building_orient o1 ON (osm_id=o1.id and o1.ip='%s')
+                LEFT JOIN building_orient o2 ON (osm_id=o2.id)
+                LEFT JOIN building_next n ON (n.id=b.osm_id AND n.nb>=0)
+                WHERE ST_DWithin(ST_SetSRID(ST_MakePoint(%s,%s),4326),geom,0.1)
+                AND surface>100 AND b.orientation>0.8 AND b.orient_type IS NULL
+                AND coalesce(n.total,0)<10 AND o1.ip IS NULL
+                GROUP by osm_id, geom, surface, b.orientation, n.nb, n.last
+                HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
+                ORDER BY %s LIMIT %s;""" % (ip,lon,lat,order,limit)
+            cur.execute(query)
+            rows = rows + cur.fetchall()
+            limit = limit - len(rows)
 
         # cookie management
         cookies = req.cookies
