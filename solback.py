@@ -32,11 +32,13 @@ class BuildingsResource(object):
             HAVING orient_type is null
             ORDER BY n.nb desc, n.last limit %s;""" , (ip, limit))
         cur.execute(query)
+        rows = cur.fetchall()
+        limit = limit - len(rows)
 
-        if cur.rowcount == 0:
-            # get one random building around our location
-            default_lat = '48.2169' # '47.7927'
-            default_lon = '-1.7521' # '3.5840'
+        if limit > 0:
+            # get random buildings around our location
+            default_lat = '48.3' # '47.7927'
+            default_lon = '-1.8' # '3.5840'
             lat = float(req.params.get('lat',default_lat))
             lon = float(req.params.get('lon',default_lon))
             if (lat == float(default_lat)):
@@ -61,6 +63,7 @@ class BuildingsResource(object):
                 HAVING (count(o2.*)<10 or (count(distinct(o2.orientation))=1 AND count(o2.*)<=3))
                 ORDER BY %s LIMIT %s;""" % (ip,lon,lat,order,limit)
             cur.execute(query)
+            rows = rows + cur.fetchall()
 
         # cookie management
         cookies = req.cookies
@@ -73,9 +76,8 @@ class BuildingsResource(object):
         resp.set_header('Access-Control-Allow-Origin', '*')
         resp.set_header('Access-Control-Allow-Headers', 'X-Requested-With')
 
-        if cur.rowcount > 0:
+        if len(rows) > 0:
             # return de Featurecollection when we have several buildings...
-            rows = cur.fetchall()
             body = dict(count=cur.rowcount, type="Featurecollection", features=[json.loads(r[0]) for r in rows])
             resp.body = json.dumps(body)
         else:
